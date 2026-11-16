@@ -53,6 +53,16 @@ FACE_COLORS_RGB = {
     'L': (0, 70, 173),
 }
 
+# Darker edge colors for cubie boundaries
+EDGE_COLORS = {
+    'U': '#CCCCCC',
+    'D': '#CCAA00',
+    'F': '#99182E',
+    'B': '#CC4600',
+    'R': '#007B3A',
+    'L': '#00388A',
+}
+
 FACE_NORMALS = {
     'U': (0, 1, 0),   # +Y
     'D': (0, -1, 0),  # -Y
@@ -63,40 +73,41 @@ FACE_NORMALS = {
 }
 
 CUBE_SIZE = 1.0
-GAP = 0.02
+GAP = 0.05  # Increased gap for visible cubie separation
 CUBIE_SIZE = CUBE_SIZE - GAP
 
 
 # ─── Geometry Generation ────────────────────────────────────────────────────
 
-def create_cubie_mesh(center_x, center_y, center_z, size, face_colors):
-    """Create mesh for a single cubie with only exterior faces."""
+def create_cubie_mesh(center_x, center_y, center_z, size, face_colors, show_edges=True):
+    """Create mesh for a single cubie with faces and optional edge lines."""
     half = size / 2
     cx, cy, cz = center_x, center_y, center_z
 
     vertices = np.array([
-        [cx - half, cy - half, cz - half],  # 0
-        [cx + half, cy - half, cz - half],  # 1
-        [cx + half, cy + half, cz - half],  # 2
-        [cx - half, cy + half, cz - half],  # 3
-        [cx - half, cy - half, cz + half],  # 4
-        [cx + half, cy - half, cz + half],  # 5
-        [cx + half, cy + half, cz + half],  # 6
-        [cx - half, cy + half, cz + half],  # 7
+        [cx - half, cy - half, cz - half],  # 0: bottom-left-back
+        [cx + half, cy - half, cz - half],  # 1: bottom-right-back
+        [cx + half, cy + half, cz - half],  # 2: top-right-back
+        [cx - half, cy + half, cz - half],  # 3: top-left-back
+        [cx - half, cy - half, cz + half],  # 4: bottom-left-front
+        [cx + half, cy - half, cz + half],  # 5: bottom-right-front
+        [cx + half, cy + half, cz + half],  # 6: top-right-front
+        [cx - half, cy + half, cz + half],  # 7: top-left-front
     ], dtype=np.float32)
 
+    # 6 faces, each as 2 triangles (12 triangles total)
     faces = [
-        # Back (-Z)
+        # Back face (-Z)
         [0, 1, 2], [0, 2, 3],
-        # Front (+Z)
+        # Front face (+Z)
         [4, 7, 6], [4, 6, 5],
-        # Bottom (-Y)
+        # Bottom face (-Y)
         [0, 4, 5], [0, 5, 1],
-        # Top (+Y)
+        # Top face (+Y)
         [3, 2, 6], [3, 6, 7],
-        # Left (-X)
+        # Left face (-X)
         [0, 3, 7], [0, 7, 4],
-        # Right (+X)
+        # Right face (+X)
         [1, 5, 6], [1, 6, 2],
     ]
     face_indices = ['B', 'F', 'D', 'U', 'L', 'R']
@@ -114,9 +125,26 @@ def create_cubie_mesh(center_x, center_y, center_z, size, face_colors):
                 mesh_vertices.extend(vertices[tri])
                 face_colors_list.extend([color] * 3)
 
+    # Create edge lines for cubie boundaries
+    edge_data = None
+    if show_edges:
+        # 12 edges of a cube
+        edges = [
+            [0, 1], [1, 2], [2, 3], [3, 0],  # back face
+            [4, 5], [5, 6], [6, 7], [7, 4],  # front face
+            [0, 4], [1, 5], [2, 6], [3, 7],  # connecting edges
+        ]
+        edge_x, edge_y, edge_z = [], [], []
+        for e in edges:
+            edge_x.extend([vertices[e[0], 0], vertices[e[1], 0], None])
+            edge_y.extend([vertices[e[0], 1], vertices[e[1], 1], None])
+            edge_z.extend([vertices[e[0], 2], vertices[e[1], 2], None])
+        edge_data = (np.array(edge_x), np.array(edge_y), np.array(edge_z))
+
     return (np.array(mesh_vertices, dtype=np.float32),
             np.array(mesh_faces, dtype=np.int32),
-            face_colors_list)
+            face_colors_list,
+            edge_data)
 
 
 def get_exterior_faces(x, y, z, n, exploded=False, explode_factor=1.5):
@@ -160,11 +188,12 @@ def get_cubie_center(i, j, k, n, exploded=False, explode_factor=1.5):
     return cx, cy, cz
 
 
-def create_rubiks_cube(n=3, exploded=False, explode_factor=1.5):
-    """Create complete N×N×N Rubik's cube mesh."""
+def create_rubiks_cube(n=3, exploded=False, explode_factor=1.5, show_edges=True):
+    """Create complete N×N×N Rubik's cube mesh with individual cubies."""
     all_vertices = []
     all_faces = []
     all_colors = []
+    all_edge_data = []
 
     for i in range(n):
         for j in range(n):
@@ -173,55 +202,83 @@ def create_rubiks_cube(n=3, exploded=False, explode_factor=1.5):
                 ext_faces = get_exterior_faces(i, j, k, n, exploded)
 
                 if ext_faces:
-                    verts, faces, colors = create_cubie_mesh(cx, cy, cz, CUBIE_SIZE, ext_faces)
+                    verts, faces, colors, edge_data = create_cubie_mesh(
+                        cx, cy, cz, CUBIE_SIZE, ext_faces, show_edges
+                    )
                     if len(verts) > 0:
                         faces_adjusted = faces + len(all_vertices) // 3
                         all_vertices.extend(verts)
                         all_faces.extend(faces_adjusted)
                         all_colors.extend(colors)
+                        if edge_data is not None:
+                            all_edge_data.append(edge_data)
 
     return (np.array(all_vertices, dtype=np.float32),
             np.array(all_faces, dtype=np.int32),
-            all_colors)
+            all_colors,
+            all_edge_data)
 
 
 # ─── Plotly Visualization ───────────────────────────────────────────────────
 
-def build_figure(vertices, faces, colors, title_suffix=""):
+def build_figure(vertices, faces, colors, edge_data_list, title_suffix=""):
     x, y, z = vertices[:, 0], vertices[:, 1], vertices[:, 2]
     i, j, k = faces[:, 0], faces[:, 1], faces[:, 2]
 
+    # Main cubie mesh
     fig = go.Figure(data=[go.Mesh3d(
         x=x, y=y, z=z,
         i=i, j=j, k=k,
         facecolor=colors,
         flatshading=True,
-        lighting=dict(ambient=0.5, diffuse=0.8, specular=0.4, roughness=0.5, fresnel=0.1),
-        lightposition=dict(x=100, y=200, z=100),
+        lighting=dict(
+            ambient=0.4,
+            diffuse=0.9,
+            specular=0.6,
+            roughness=0.3,
+            fresnel=0.15
+        ),
+        lightposition=dict(x=200, y=300, z=200),
         hoverinfo='none',
         showscale=False,
     )])
 
+    # Add edge lines for each cubie
+    for edge_x, edge_y, edge_z in edge_data_list:
+        fig.add_trace(go.Scatter3d(
+            x=edge_x, y=edge_y, z=edge_z,
+            mode='lines',
+            line=dict(color='#1a1a1a', width=2),
+            hoverinfo='none',
+            showlegend=False,
+        ))
+
+    # Apple-style camera and scene
     fig.update_layout(
         title=dict(
             text=f"Rubik's Cube {title_suffix}",
             x=0.5,
-            font=dict(size=20, family='Arial, sans-serif', color='white')
+            font=dict(size=24, family='-apple-system, BlinkMacSystemFont, "SF Pro Display", Helvetica, Arial, sans-serif', color='#1d1d1f', weight=600)
         ),
         scene=dict(
-            xaxis=dict(visible=False, showgrid=False, zeroline=False),
-            yaxis=dict(visible=False, showgrid=False, zeroline=False),
-            zaxis=dict(visible=False, showgrid=False, zeroline=False),
+            xaxis=dict(visible=False, showgrid=False, zeroline=False, showbackground=False),
+            yaxis=dict(visible=False, showgrid=False, zeroline=False, showbackground=False),
+            zaxis=dict(visible=False, showgrid=False, zeroline=False, showbackground=False),
             aspectmode='data',
-            camera=dict(eye=dict(x=1.8, y=1.8, z=1.2), center=dict(x=0, y=0, z=0), up=dict(x=0, y=1, z=0)),
+            camera=dict(
+                eye=dict(x=1.6, y=1.6, z=1.2),
+                center=dict(x=0, y=0, z=0),
+                up=dict(x=0, y=1, z=0),
+            ),
             dragmode='orbit',
-            bgcolor='#111111',
+            bgcolor='rgba(0,0,0,0)',
         ),
-        margin=dict(l=0, r=0, t=60, b=0),
-        paper_bgcolor='#111111',
-        font=dict(color='white'),
+        margin=dict(l=0, r=0, t=80, b=0),
+        paper_bgcolor='rgba(0,0,0,0)',
+        font=dict(color='#1d1d1f', family='-apple-system, BlinkMacSystemFont, "SF Pro Display", Helvetica, Arial, sans-serif'),
         showlegend=False,
     )
+
     return fig
 
 
@@ -232,7 +289,6 @@ def export_stl(vertices, faces, colors, output_path, n):
     if not TRIMESH_AVAILABLE:
         raise RuntimeError("trimesh not installed. Run: pip install trimesh")
 
-    # Create a mesh for each color group
     meshes = []
     color_to_indices = {}
 
@@ -241,7 +297,6 @@ def export_stl(vertices, faces, colors, output_path, n):
 
     for color, face_indices in color_to_indices.items():
         face_verts = vertices[faces[face_indices]].reshape(-1, 3)
-        # Deduplicate vertices
         unique_verts, inverse = np.unique(face_verts, axis=0, return_inverse=True)
         face_tris = inverse.reshape(-1, 3)
 
@@ -250,7 +305,6 @@ def export_stl(vertices, faces, colors, output_path, n):
                                     for _ in range(len(face_tris))]
         meshes.append(mesh)
 
-    # Combine
     combined = trimesh.util.concatenate(meshes)
     combined.export(str(output_path))
     print(f"✓ Saved STL: {output_path}")
@@ -270,11 +324,9 @@ def export_obj(vertices, faces, colors, output_path):
         f.write("# Rubik's Cube OBJ Export\n")
         f.write(f"# Vertices: {len(vertices)}, Faces: {len(faces)}\n\n")
 
-        # Write vertices
         for v in vertices:
             f.write(f"v {v[0]:.6f} {v[1]:.6f} {v[2]:.6f}\n")
 
-        # Group faces by color
         color_groups = {}
         for idx, (face, color) in enumerate(zip(faces, colors)):
             color_groups.setdefault(color, []).append(face)
@@ -284,7 +336,6 @@ def export_obj(vertices, faces, colors, output_path):
             f.write(f"\ng {face_name}\n")
             f.write(f"usemtl {face_name}\n")
             for face in face_list:
-                # OBJ is 1-indexed
                 f.write(f"f {face[0]+1} {face[1]+1} {face[2]+1}\n")
 
     print(f"✓ Saved OBJ: {output_path}")
@@ -294,38 +345,30 @@ def export_obj(vertices, faces, colors, output_path):
 
 class CubeState:
     """Represents the state of an N×N×N Rubik's cube for animation/solving."""
-    # Face indices: 0=U, 1=D, 2=F, 3=B, 4=R, 5=L
     FACE_NAMES = ['U', 'D', 'F', 'B', 'R', 'L']
 
     def __init__(self, n=3):
         self.n = n
-        # Each face is n×n array of color indices
         self.faces = {
-            'U': np.zeros((n, n), dtype=int),  # White = 0
-            'D': np.ones((n, n), dtype=int),   # Yellow = 1
-            'F': np.full((n, n), 2, dtype=int), # Red = 2
-            'B': np.full((n, n), 3, dtype=int), # Orange = 3
-            'R': np.full((n, n), 4, dtype=int), # Green = 4
-            'L': np.full((n, n), 5, dtype=int), # Blue = 5
+            'U': np.zeros((n, n), dtype=int),
+            'D': np.ones((n, n), dtype=int),
+            'F': np.full((n, n), 2, dtype=int),
+            'B': np.full((n, n), 3, dtype=int),
+            'R': np.full((n, n), 4, dtype=int),
+            'L': np.full((n, n), 5, dtype=int),
         }
 
     def rotate_face(self, face, clockwise=True, layer=0):
-        """Rotate a face (and its layer). layer=0 is outermost."""
-        # TODO: Implement full cube rotation logic
         pass
 
     def scramble(self, moves=20):
-        """Apply random moves to scramble."""
         import random
         moves_list = ["U", "U'", "D", "D'", "F", "F'", "B", "B'", "R", "R'", "L", "L'"]
         for _ in range(moves):
             move = random.choice(moves_list)
-            # TODO: Apply move
         return self
 
     def to_mesh_colors(self):
-        """Convert cube state to mesh face colors for visualization."""
-        # TODO: Map internal state to exterior face colors
         pass
 
 
@@ -336,6 +379,7 @@ def main():
     parser.add_argument('--size', '-s', type=int, default=3, help='Cube size (N×N×N), default: 3')
     parser.add_argument('--exploded', '-e', action='store_true', help='Exploded view (all faces visible)')
     parser.add_argument('--explode-factor', type=float, default=1.5, help='Explosion distance factor')
+    parser.add_argument('--no-edges', action='store_true', help='Hide cubie edge lines')
     parser.add_argument('--html', action='store_true', default=True, help='Export interactive HTML (default: on)')
     parser.add_argument('--no-html', dest='html', action='store_false', help='Skip HTML export')
     parser.add_argument('--png', action='store_true', help='Export static PNG (requires Chrome/kaleido)')
@@ -356,25 +400,24 @@ def main():
     print(f"Building {args.size}×{args.size}×{args.size} Rubik's cube"
           f"{' (exploded)' if args.exploded else ''}...")
 
-    vertices, faces, colors = create_rubiks_cube(args.size, args.exploded, args.explode_factor)
+    vertices, faces, colors, edge_data = create_rubiks_cube(
+        args.size, args.exploded, args.explode_factor, show_edges=not args.no_edges
+    )
     print(f"  Vertices: {len(vertices)}")
     print(f"  Triangles: {len(faces)}")
-    visible_cubies = sum(1 for i in range(args.size) for j in range(args.size) for k in range(args.size)
-                         if get_exterior_faces(i, j, k, args.size, args.exploded))
-    print(f"  Cubies rendered: {visible_cubies}")
+    print(f"  Cubies rendered: {len(edge_data)}")
+    print(f"  Edge lines: {len(edge_data) * 12}")
 
     title = args.title or f"{args.size}×{args.size}×{args.size}"
     if args.exploded:
         title += " Exploded"
-    fig = build_figure(vertices, faces, colors, title)
+    fig = build_figure(vertices, faces, colors, edge_data, title)
 
-    # HTML export
     if args.html:
         html_path = output_dir / f"rubiks_{args.size}x{args.size}x{args.size}{'_exploded' if args.exploded else ''}.html"
-        fig.write_html(str(html_path), include_plotlyjs='cdn')
+        fig.write_html(str(html_path), include_plotlyjs='cdn', full_html=True)
         print(f"✓ Saved interactive HTML: {html_path}")
 
-    # PNG export
     if args.png:
         png_path = output_dir / f"rubiks_{args.size}x{args.size}x{args.size}{'_exploded' if args.exploded else ''}.png"
         try:
@@ -384,7 +427,6 @@ def main():
             print(f"⚠ PNG export failed (need Chrome): {e}")
             print("  Install with: plotly_get_chrome")
 
-    # STL export
     if args.stl:
         stl_path = output_dir / f"rubiks_{args.size}x{args.size}x{args.size}{'_exploded' if args.exploded else ''}.stl"
         try:
@@ -393,7 +435,6 @@ def main():
             print(f"⚠ STL export failed: {e}")
             print("  Install with: pip install trimesh")
 
-    # OBJ export
     if args.obj:
         obj_path = output_dir / f"rubiks_{args.size}x{args.size}x{args.size}{'_exploded' if args.exploded else ''}.obj"
         try:
