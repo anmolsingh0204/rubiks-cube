@@ -1,6 +1,11 @@
 # 3D Rubik's Cube Generator
 
+[![Live Demo](https://img.shields.io/badge/Live%20Demo-https://anmolsingh0204.github.io/rubiks--cube/-blue?style=for-the-badge&logo=github)](https://anmolsingh0204.github.io/rubiks-cube/)
+[![GitHub Repo](https://img.shields.io/badge/GitHub-anmolsingh0204/rubiks--cube-black?style=for-the-badge&logo=github)](https://github.com/anmolsingh0204/rubiks-cube)
+
 A Python tool to generate interactive 3D Rubik's cubes of any size (N×N×N) with multiple export formats.
+
+> **🔗 Live Demo:** https://anmolsingh0204.github.io/rubiks-cube/
 
 ## Features
 
