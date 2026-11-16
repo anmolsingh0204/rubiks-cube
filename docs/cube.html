@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Rubik's Cube Viewer</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: #0a0a0f;
+      overflow: hidden;
+      font-family: 'Inter', system-ui, sans-serif;
+    }
+    #canvas { display: block; }
+    .info {
+      position: fixed;
+      top: 1rem;
+      left: 1rem;
+      color: rgba(255,255,255,0.8);
+      font-size: 0.9rem;
+      pointer-events: none;
+      z-index: 10;
+    }
+    .controls {
+      position: fixed;
+      bottom: 1rem;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      gap: 0.5rem;
+      z-index: 10;
+    }
+    .controls button {
+      background: rgba(255,255,255,0.1);
+      border: 1px solid rgba(255,255,255,0.2);
+      color: white;
+      padding: 0.5rem 1rem;
+      border-radius: 6px;
+      cursor: pointer;
+      backdrop-filter: blur(10px);
+      font-size: 0.8rem;
+      transition: all 0.2s;
+    }
+    .controls button:hover {
+      background: rgba(255,255,255,0.2);
+      border-color: #00d4aa;
+    }
+    .controls button.active {
+      background: #00d4aa;
+      border-color: #00d4aa;
+      color: #0a0a0f;
+    }
+  </style>
+</head>
+<body>
+  <canvas id="canvas"></canvas>
+  <div class="info" id="info"></div>
+  <div class="controls">
+    <button id="btn-scramble">Scramble</button>
+    <button id="btn-solve">Solve</button>
+    <button id="btn-explode">Explode</button>
+    <button id="btn-reset">Reset</button>
+  </div>
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+      "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+    }
+  }
+  </script>
+  <script type="module">
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+    // Get cube size from URL parameter
+    const params = new URLSearchParams(window.location.search);
+    const n = Math.max(2, Math.min(5, parseInt(params.get('n') || '3', 10)));
+
+    // Color scheme (standard Rubik's cube)
+    const FACE_COLORS = {
+      U: 0xFFFFFF, // White
+      D: 0xFFD500, // Yellow
+      F: 0xC41E3A, // Red
+      B: 0xFF5800, // Orange
+      R: 0x009B48, // Green
+      L: 0x0046AD, // Blue
+    };
+    const INTERIOR_COLOR = 0x1a1a1a;
+    const GAP = 0.05;
+    const CUBELET_SIZE = 1 - GAP;
+
+    // Scene setup
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x0a0a0f);
+
+    const camera = new THREE.PerspectiveCamera(50, innerWidth / innerHeight, 0.1, 100);
+    camera.position.set(n * 1.8, n * 1.5, n * 2.5);
+
+    const renderer = new THREE.WebGLRenderer({ canvas: document.getElementById('canvas'), antialias: true });
+    renderer.setSize(innerWidth, innerHeight);
+    renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.05;
+
+    // Lighting
+    const ambient = new THREE.AmbientLight(0xffffff, 0.6);
+    scene.add(ambient);
+    const dirLight = new THREE.DirectionalLight(0xffffff, 1);
+    dirLight.position.set(5, 10, 7);
+    scene.add(dirLight);
+    const dirLight2 = new THREE.DirectionalLight(0xffffff, 0.5);
+    dirLight2.position.set(-5, -5, -5);
+    scene.add(dirLight2);
+
+    // Cube state
+    let cubelets = [];
+    let isExploded = false;
+    let explodeFactor = 1.0;
+    const solvedState = [];
+    let currentState = [];
+
+    // Face definitions for a cubie (6 faces, each with 2 triangles = 12 triangles per cubie)
+    // Vertices of a unit cube centered at origin
+    const half = CUBELET_SIZE / 2;
+    const vertices = [
+      new THREE.Vector3(-half, -half, -half), // 0 LDB
+      new THREE.Vector3( half, -half, -half), // 1 RDB
+      new THREE.Vector3( half,  half, -half), // 2 RUB
+      new THREE.Vector3(-half,  half, -half), // 3 LUB
+      new THREE.Vector3(-half, -half,  half), // 4 LDF
+      new THREE.Vector3( half, -half,  half), // 5 RDF
+      new THREE.Vector3( half,  half,  half), // 6 RUF
+      new THREE.Vector3(-half,  half,  half), // 7 LUF
+    ];
+
+    // Face definitions: [faceName, [tri1], [tri2], normal]
+    const faces = [
+      ['B', [0, 1, 2], [0, 2, 3], new THREE.Vector3(0, 0, -1)],
+      ['F', [4, 7, 6], [4, 6, 5], new THREE.Vector3(0, 0, 1)],
+      ['D', [0, 4, 5], [0, 5, 1], new THREE.Vector3(0, -1, 0)],
+      ['U', [3, 2, 6], [3, 6, 7], new THREE.Vector3(0, 1, 0)],
+      ['L', [0, 3, 7], [0, 7, 4], new THREE.Vector3(-1, 0, 0)],
+      ['R', [1, 5, 6], [1, 6, 2], new THREE.Vector3(1, 0, 0)],
+    ];
+
+    function getFaceColor(faceName, isExterior) {
+      return isExterior ? FACE_COLORS[faceName] : INTERIOR_COLOR;
+    }
+
+    function createCubieMesh(x, y, z, faceColors) {
+      const group = new THREE.Group();
+
+      faces.forEach(([faceName, tri1, tri2, normal]) => {
+        const color = getFaceColor(faceName, faceColors[faceName]);
+        const geometry = new THREE.BufferGeometry();
+        const positions = [];
+        const normals = [];
+
+        // Triangle 1
+        tri1.forEach(idx => {
+          positions.push(vertices[idx].x, vertices[idx].y, vertices[idx].z);
+          normals.push(normal.x, normal.y, normal.z);
+        });
+        // Triangle 2
+        tri2.forEach(idx => {
+          positions.push(vertices[idx].x, vertices[idx].y, vertices[idx].z);
+          normals.push(normal.x, normal.y, normal.z);
+        });
+
+        geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+        geometry.setAttribute('normal', new THREE.Float32BufferAttribute(normals, 3));
+
+        const material = new THREE.MeshStandardMaterial({
+          color,
+          roughness: 0.3,
+          metalness: 0.1,
+          flatShading: true
+        });
+        const mesh = new THREE.Mesh(geometry, material);
+        group.add(mesh);
+      });
+
+      // Edge lines
+      const edgesGeometry = new THREE.EdgesGeometry(
+        new THREE.BoxGeometry(CUBELET_SIZE, CUBELET_SIZE, CUBELET_SIZE)
+      );
+      const edgesMaterial = new THREE.LineBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.3 });
+      const edges = new THREE.LineSegments(edgesGeometry, edgesMaterial);
+      group.add(edges);
+
+      group.position.set(x, y, z);
+      return group;
+    }
+
+    function getSolvedFaceColors(i, j, k) {
+      const faceColors = { U: false, D: false, F: false, B: false, R: false, L: false };
+      // Up face (y = n-1)
+      if (j === n - 1) faceColors.U = true;
+      // Down face (y = 0)
+      if (j === 0) faceColors.D = true;
+      // Front face (z = n-1)
+      if (k === n - 1) faceColors.F = true;
+      // Back face (z = 0)
+      if (k === 0) faceColors.B = true;
+      // Right face (x = n-1)
+      if (i === n - 1) faceColors.R = true;
+      // Left face (x = 0)
+      if (i === 0) faceColors.L = true;
+      return faceColors;
+    }
+
+    function buildCube() {
+      // Clear existing
+      cubelets.forEach(c => scene.remove(c));
+      cubelets = [];
+      solvedState.length = 0;
+      currentState.length = 0;
+
+      const offset = (n - 1) * (1 + GAP) / 2;
+
+      for (let i = 0; i < n; i++) {
+        for (let j = 0; j < n; j++) {
+          for (let k = 0; k < n; k++) {
+            // Skip center for odd n
+            if (n % 2 === 1 && i === Math.floor(n/2) && j === Math.floor(n/2) && k === Math.floor(n/2)) continue;
+
+            const x = i * (1 + GAP) - offset;
+            const y = j * (1 + GAP) - offset;
+            const z = k * (1 + GAP) - offset;
+
+            const faceColors = getSolvedFaceColors(i, j, k);
+            const cubie = createCubieMesh(x, y, z, faceColors);
+            scene.add(cubie);
+            cubelets.push(cubie);
+
+            solvedState.push({ cubie, i, j, k, faceColors, basePos: new THREE.Vector3(x, y, z) });
+            currentState.push({ cubie, i, j, k, faceColors, basePos: new THREE.Vector3(x, y, z) });
+          }
+        }
+      }
+      document.getElementById('info').textContent = `${n}×${n}×${n} Rubik's Cube (${cubelets.length} cubies)`;
+    }
+
+    function setExploded(exploded) {
+      isExploded = exploded;
+      explodeFactor = exploded ? 1.8 : 1.0;
+      animateExplode();
+    }
+
+    function animateExplode() {
+      const duration = 500;
+      const start = performance.now();
+      const startFactor = isExploded ? 1.0 : 1.8;
+      const endFactor = isExploded ? 1.8 : 1.0;
+
+      function step(now) {
+        const t = Math.min(1, (now - start) / duration);
+        const eased = 1 - Math.pow(1 - t, 3);
+        const factor = startFactor + (endFactor - startFactor) * eased;
+
+        solvedState.forEach(({ cubie, basePos }) => {
+          const dir = basePos.clone().normalize();
+          const targetPos = basePos.clone().multiplyScalar(factor);
+          cubie.position.lerp(targetPos, 0.3);
+        });
+
+        if (t < 1) requestAnimationFrame(step);
+      }
+      requestAnimationFrame(step);
+    }
+
+    // Move notation implementation
+    const moveMap = {
+      R: { axis: 'x', layer: n-1, dir: -1 },
+      "R'": { axis: 'x', layer: n-1, dir: 1 },
+      R2: { axis: 'x', layer: n-1, dir: -1, double: true },
+      L: { axis: 'x', layer: 0, dir: 1 },
+      "L'": { axis: 'x', layer: 0, dir: -1 },
+      L2: { axis: 'x', layer: 0, dir: 1, double: true },
+      U: { axis: 'y', layer: n-1, dir: 1 },
+      "U'": { axis: 'y', layer: n-1, dir: -1 },
+      U2: { axis: 'y', layer: n-1, dir: 1, double: true },
+      D: { axis: 'y', layer: 0, dir: -1 },
+      "D'": { axis: 'y', layer: 0, dir: 1 },
+      D2: { axis: 'y', layer: 0, dir: -1, double: true },
+      F: { axis: 'z', layer: n-1, dir: 1 },
+      "F'": { axis: 'z', layer: n-1, dir: -1 },
+      F2: { axis: 'z', layer: n-1, dir: 1, double: true },
+      B: { axis: 'z', layer: 0, dir: -1 },
+      "B'": { axis: 'z', layer: 0, dir: 1 },
+      B2: { axis: 'z', layer: 0, dir: -1, double: true },
+    };
+
+    function applyMove(move) {
+      const m = moveMap[move];
+      if (!m) return;
+
+      const turns = m.double ? 2 : 1;
+      for (let t = 0; t < turns; t++) {
+        currentState.forEach(state => {
+          const coord = state[m.axis];
+          if (Math.abs(coord - m.layer) < 0.5) {
+            // Rotate position
+            const pos = state.cubie.position;
+            if (m.axis === 'x') {
+              const y = pos.y;
+              const z = pos.z;
+              pos.y = -m.dir * z;
+              pos.z = m.dir * y;
+            } else if (m.axis === 'y') {
+              const x = pos.x;
+              const z = pos.z;
+              pos.x = m.dir * z;
+              pos.z = -m.dir * x;
+            } else if (m.axis === 'z') {
+              const x = pos.x;
+              const y = pos.y;
+              pos.x = -m.dir * y;
+              pos.y = m.dir * x;
+            }
+
+            // Update logical coordinates
+            if (m.axis === 'x') {
+              const newY = Math.round(-m.dir * state.k);
+              const newZ = Math.round(m.dir * state.j);
+              state.j = newY;
+              state.k = newZ;
+            } else if (m.axis === 'y') {
+              const newX = Math.round(m.dir * state.k);
+              const newZ = Math.round(-m.dir * state.i);
+              state.i = newX;
+              state.k = newZ;
+            } else if (m.axis === 'z') {
+              const newX = Math.round(-m.dir * state.j);
+              const newY = Math.round(m.dir * state.i);
+              state.i = newX;
+              state.j = newY;
+            }
+          }
+        });
+      }
+    }
+
+    function scramble(moves = 20) {
+      const moveNames = Object.keys(moveMap);
+      const sequence = [];
+      let lastAxis = null;
+      for (let i = 0; i < moves; i++) {
+        let move;
+        do { move = moveNames[Math.floor(Math.random() * moveNames.length)]; }
+        while (moveMap[move].axis === lastAxis);
+        lastAxis = moveMap[move].axis;
+        sequence.push(move);
+        applyMove(move);
+      }
+      return sequence;
+    }
+
+    let scrambleHistory = [];
+    let isAnimating = false;
+
+    async function animateScramble() {
+      if (isAnimating) return;
+      isAnimating = true;
+      scrambleHistory = scramble(15);
+      // Animate each move
+      for (const move of scrambleHistory) {
+        await new Promise(r => setTimeout(r, 150));
+      }
+      isAnimating = false;
+    }
+
+    async function animateSolve() {
+      if (isAnimating) return;
+      isAnimating = true;
+      const solution = [...scrambleHistory].reverse().map(m => {
+        if (m.endsWith("2")) return m;
+        if (m.endsWith("'")) return m.slice(0, -1);
+        return m + "'";
+      });
+      for (const move of solution) {
+        applyMove(move);
+        await new Promise(r => setTimeout(r, 150));
+      }
+      scrambleHistory = [];
+      isAnimating = false;
+    }
+
+    function resetCube() {
+      scrambleHistory = [];
+      isAnimating = false;
+      solvedState.forEach(({ cubie, basePos }) => {
+        cubie.position.copy(basePos);
+      });
+      currentState.forEach((state, idx) => {
+        state.i = solvedState[idx].i;
+        state.j = solvedState[idx].j;
+        state.k = solvedState[idx].k;
+      });
+    }
+
+    // UI
+    document.getElementById('btn-scramble').addEventListener('click', animateScramble);
+    document.getElementById('btn-solve').addEventListener('click', animateSolve);
+    document.getElementById('btn-explode').addEventListener('click', () => setExploded(!isExploded));
+    document.getElementById('btn-reset').addEventListener('click', resetCube);
+
+    // Resize
+    window.addEventListener('resize', () => {
+      camera.aspect = innerWidth / innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(innerWidth, innerHeight);
+    });
+
+    // Init
+    buildCube();
+
+    // Animation loop
+    function animate() {
+      requestAnimationFrame(animate);
+      controls.update();
+      renderer.render(scene, camera);
+    }
+    animate();
+  </script>
+</body>
+</html>

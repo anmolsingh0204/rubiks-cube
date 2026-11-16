@@ -52,7 +52,7 @@
     /* Animated background */
     .bg-layer {
       position: fixed; inset: 0; z-index: -1; pointer-events: none;
-      background: 
+      background:
         radial-gradient(ellipse 80% 50% at 20% 10%, var(--accent-dim) 0%, transparent 50%),
         radial-gradient(ellipse 60% 40% at 80% 90%, #6366f133 0%, transparent 50%),
         radial-gradient(ellipse 40% 30% at 50% 50%, #ec489922 0%, transparent 60%);
@@ -65,7 +65,7 @@
     }
     .grid-overlay {
       position: fixed; inset: 0; z-index: -1; pointer-events: none; opacity: 0.03;
-      background-image: 
+      background-image:
         linear-gradient(rgba(255,255,255,0.1) 1px, transparent 1px),
         linear-gradient(90deg, rgba(255,255,255,0.1) 1px, transparent 1px);
       background-size: 60px 60px;
@@ -93,14 +93,8 @@
     .stat { text-align: center; }
     .stat-value { font-family: 'Space Grotesk', sans-serif; font-size: 2.5rem; font-weight: 700; color: var(--accent); line-height: 1; }
     .stat-label { font-size: 0.85rem; color: var(--fg-muted); margin-top: 0.25rem; }
-    /* Sections */
-    section { margin-bottom: 4rem; }
-    .section-header { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 2rem; flex-wrap: wrap; gap: 1rem; }
-    .section-title { font-family: 'Space Grotesk', sans-serif; font-size: 1.75rem; font-weight: 600; }
-    .section-link { color: var(--accent); text-decoration: none; font-weight: 500; font-size: 0.95rem; transition: opacity 0.2s; }
-    .section-link:hover { opacity: 0.7; }
     /* Cube Grid */
-    .cube-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 1.5rem; }
+    .cube-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.5rem; margin-top: 2rem; }
     .cube-card {
       background: var(--card-bg); border: 1px solid var(--card-border);
       border-radius: var(--radius); overflow: hidden;
@@ -125,7 +119,7 @@
     .btn-secondary:hover { background: var(--card-bg); border-color: var(--accent-dim); color: var(--accent); }
     .btn-sm { padding: 0.4rem 0.8rem; font-size: 0.8rem; }
     /* Feature cards */
-    .feature-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 1.5rem; }
+    .feature-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 1.5rem; margin-top: 2rem; }
     .feature-card { background: var(--glass-bg); border: 1px solid var(--glass-border); border-radius: var(--radius); padding: 2rem; backdrop-filter: blur(20px); transition: all 0.3s; }
     .feature-card:hover { border-color: var(--accent-dim); transform: translateY(-4px); }
     .feature-icon { width: 48px; height: 48px; border-radius: 12px; background: var(--accent-dim); display: flex; align-items: center; justify-content: center; margin-bottom: 1rem; color: var(--accent); }
@@ -152,10 +146,10 @@
     <header>
       <div class="badge">Live Demo · GitHub Pages</div>
       <h1>3D Rubik's Cube Gallery</h1>
-      <p class="subtitle">Interactive N×N×N cubes with shuffle/solve animation, exploded views, and 3D printing exports — built with Plotly.js and Python</p>
+      <p class="subtitle">Interactive N×N×N cubes with shuffle/solve animation, exploded views, and 3D printing exports — built with Three.js</p>
       <div class="stats">
-        <div class="stat"><div class="stat-value">5</div><div class="stat-label">Cube Sizes (2–5)</div></div>
-        <div class="stat"><div class="stat-value">4</div><div class="stat-label">View Modes</div></div>
+        <div class="stat"><div class="stat-value">4</div><div class="stat-label">Cube Sizes (2–5)</div></div>
+        <div class="stat"><div class="stat-value">1</div><div class="stat-label">Unified Viewer</div></div>
         <div class="stat"><div class="stat-value">3</div><div class="stat-label">Export Formats</div></div>
         <div class="stat"><div class="stat-value">60fps</div><div class="stat-label">WebGL Rendering</div></div>
       </div>
@@ -164,33 +158,13 @@
     <section class="reveal">
       <div class="section-header">
         <h2 class="section-title">Interactive Cubes</h2>
-        <a href="#static" class="section-link">View Static →</a>
       </div>
-      <div class="cube-grid" id="interactive-grid">
+      <div class="cube-grid" id="cube-grid">
         <!-- Populated by JS -->
       </div>
     </section>
 
-    <section id="static" class="reveal">
-      <div class="section-header">
-        <h2 class="section-title">Static Previews</h2>
-        <a href="#exploded" class="section-link">Exploded Views →</a>
-      </div>
-      <div class="cube-grid" id="static-grid">
-        <!-- Populated by JS -->
-      </div>
-    </section>
-
-    <section id="exploded" class="reveal">
-      <div class="section-header">
-        <h2 class="section-title">Exploded Views</h2>
-      </div>
-      <div class="cube-grid" id="exploded-grid">
-        <!-- Populated by JS -->
-      </div>
-    </section>
-
-    <section class="reveal">
+    <section class="reveal" style="margin-top: 4rem;">
       <div class="section-header">
         <h2 class="section-title">Features</h2>
       </div>
@@ -198,17 +172,17 @@
         <div class="feature-card">
           <div class="feature-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg></div>
           <h3 class="feature-title">N×N×N Cubes (2–5)</h3>
-          <p class="feature-desc">Generate Pocket Cube (2×2×2) through Professor's Cube (5×5×5) with correct cubie geometry and color mapping.</p>
+          <p class="feature-desc">Pocket Cube (2×2×2) through Professor's Cube (5×5×5) with correct cubie geometry and color mapping.</p>
         </div>
         <div class="feature-card">
           <div class="feature-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"></polyline><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg></div>
           <h3 class="feature-title">Shuffle & Animated Solve</h3>
-          <p class="feature-desc">Scramble with configurable moves, then watch the automated solve animation with adjustable speed (0.5×–2.0×).</p>
+          <p class="feature-desc">Scramble with configurable moves, then watch the automated solve animation.</p>
         </div>
         <div class="feature-card">
           <div class="feature-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path></svg></div>
           <h3 class="feature-title">Exploded View</h3>
-          <p class="feature-desc">Separate all cubies to see interior faces (dark gray) and understand the 3D structure of every piece.</p>
+          <p class="feature-desc">Separate all cubies to see interior faces (dark gray) and understand the 3D structure.</p>
         </div>
         <div class="feature-card">
           <div class="feature-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg></div>
@@ -218,12 +192,12 @@
         <div class="feature-card">
           <div class="feature-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><path d="M12 6v6l4 2"></path></svg></div>
           <h3 class="feature-title">Standard Notation</h3>
-          <p class="feature-desc">Full move support: R, U, F, L, D, B with prime (') and double (2) modifiers. Scramble history preserved.</p>
+          <p class="feature-desc">Full move support: R, U, F, L, D, B with prime (') and double (2) modifiers.</p>
         </div>
         <div class="feature-card">
           <div class="feature-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"></path><path d="M12 6v6l4 2"></path></svg></div>
           <h3 class="feature-title">Dark/Light Mode</h3>
-          <p class="feature-desc">Automatic theme detection with glassmorphism UI that adapts to system preference — no flash, no toggle needed.</p>
+          <p class="feature-desc">Automatic theme detection with glassmorphism UI that adapts to system preference.</p>
         </div>
       </div>
     </section>
@@ -234,40 +208,35 @@
   </div>
 
   <script>
-    // Cube data
     const cubes = [
-      { size: 2, name: "2×2×2 Pocket Cube", cubies: 8, stickers: 24 },
-      { size: 3, name: "3×3×3 Standard", cubies: 26, stickers: 54 },
-      { size: 4, name: "4×4×4 Rubik's Revenge", cubies: 56, stickers: 96 },
-      { size: 5, name: "5×5×5 Professor's Cube", cubies: 98, stickers: 150 }
+      { n: 2, name: "2×2×2 Pocket Cube", cubies: 8, stickers: 24 },
+      { n: 3, name: "3×3×3 Standard", cubies: 26, stickers: 54 },
+      { n: 4, name: "4×4×4 Rubik's Revenge", cubies: 56, stickers: 96 },
+      { n: 5, name: "5×5×5 Professor's Cube", cubies: 98, stickers: 150 }
     ];
 
-    function createCard(cube, type) {
-      const isInteractive = type === 'interactive';
-      const isExploded = type === 'exploded';
-      const suffix = isInteractive ? '_interactive' : (isExploded ? '_exploded' : '');
-      const explodedLabel = isExploded ? 'exploded' : '';
-      const href = `rubiks_${cube.size}x${cube.size}x${cube.size}${suffix}.html`;
-      const stlHref = `rubiks_${cube.size}x${cube.size}x${cube.size}${suffix}.stl`;
-      const objHref = `rubiks_${cube.size}x${cube.size}x${cube.size}${suffix}.obj`;
-      const hasExports = !isInteractive; // Static and exploded have exports
+    function createCard(cube) {
+      const href = `cube.html?n=${cube.n}`;
+      const stlHref = `rubiks_${cube.n}x${cube.n}x${cube.n}.stl`;
+      const objHref = `rubiks_${cube.n}x${cube.n}x${cube.n}.obj`;
+      const hasExports = true;
 
       return `
         <article class="cube-card" style="animation-delay: ${cubes.indexOf(cube) * 80}ms">
           <div class="cube-preview">
-            <iframe src="${href}" loading="lazy" title="${cube.name} ${explodedLabel}"></iframe>
+            <iframe src="${href}" loading="lazy" title="${cube.name}"></iframe>
           </div>
           <div class="cube-info">
-            <h3 class="cube-name">${cube.name}${explodedLabel ? ' (Exploded)' : ''}</h3>
+            <h3 class="cube-name">${cube.name}</h3>
             <div class="cube-meta">
               <span>${cube.cubies} cubies</span>
               <span>${cube.stickers} stickers</span>
-              <span>${cube.size}³</span>
+              <span>${cube.n}³</span>
             </div>
             <div class="cube-actions">
               <a href="${href}" class="btn btn-primary" target="_blank" rel="noopener">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
-                ${isInteractive ? 'Open Interactive' : 'View'}
+                Open
               </a>
               ${hasExports ? `
                 <a href="${stlHref}" class="btn btn-secondary btn-sm" download>
@@ -283,10 +252,7 @@
       `;
     }
 
-    // Populate grids
-    document.getElementById('interactive-grid').innerHTML = cubes.map(c => createCard(c, 'interactive')).join('');
-    document.getElementById('static-grid').innerHTML = cubes.map(c => createCard(c, 'static')).join('');
-    document.getElementById('exploded-grid').innerHTML = cubes.map(c => createCard(c, 'exploded')).join('');
+    document.getElementById('cube-grid').innerHTML = cubes.map(createCard).join('');
 
     // Scroll reveal
     const observer = new IntersectionObserver((entries) => {
@@ -299,11 +265,6 @@
     }, { threshold: 0.1, rootMargin: '0px 0px -50px 0px' });
 
     document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
-
-    // Stagger card animations
-    document.querySelectorAll('.cube-card').forEach((card, i) => {
-      card.style.animationDelay = `${(i % 4) * 80}ms`;
-    });
   </script>
 </body>
 </html>
