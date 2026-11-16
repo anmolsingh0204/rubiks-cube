@@ -394,55 +394,76 @@ class CubeState:
         return colors
 
 
-# ══════════════════════════════════════════════════════════════════════════════
-# GEOMETRY GENERATION
-# ══════════════════════════════════════════════════════════════════════════════
+# ═══════════════════════════════════════════════════════════════════════════════
+# GEOMETRY GENERATION — FIXED
+# ═══════════════════════════════════════════════════════════════════════════════
+
+INTERIOR_COLOR = '#1a1a1a'  # Dark gray for interior faces
+
+# Face definitions: each face = 2 triangles (CCW winding from outside)
+# Vertices: 0=LDB, 1=RDB, 2=RUB, 3=LUB, 4=LDF, 5=RDF, 6=RUF, 7=LUF
+CUBE_FACES = [
+    # Back (-Z): vertices 0,1,2,3
+    ([0, 1, 2], [0, 2, 3], 'B'),
+    # Front (+Z): vertices 4,5,6,7
+    ([4, 7, 6], [4, 6, 5], 'F'),
+    # Bottom (-Y): vertices 0,1,5,4
+    ([0, 1, 5], [0, 5, 4], 'D'),
+    # Top (+Y): vertices 3,2,6,7
+    ([3, 2, 6], [3, 6, 7], 'U'),
+    # Left (-X): vertices 0,3,7,4
+    ([0, 3, 7], [0, 7, 4], 'L'),
+    # Right (+X): vertices 1,5,6,2
+    ([1, 5, 6], [1, 6, 2], 'R'),
+]
+
+FACE_ORDER = ['B', 'F', 'D', 'U', 'L', 'R']
+
 
 def create_cubie_mesh(center_x, center_y, center_z, size, face_colors, show_edges=True):
-    """Create mesh for a single cubie with faces and optional edge lines."""
+    """
+    Create mesh for a single cubie with ALL 6 faces.
+    face_colors: dict mapping face_name -> color (sticker color for exterior, INTERIOR_COLOR for interior)
+    Returns: vertices (V,3), faces (F,3), face_colors (F,), edge_data
+    """
     half = size / 2
     cx, cy, cz = center_x, center_y, center_z
 
+    # 8 vertices of the cubie
     vertices = np.array([
-        [cx - half, cy - half, cz - half],  # 0
-        [cx + half, cy - half, cz - half],  # 1
-        [cx + half, cy + half, cz - half],  # 2
-        [cx - half, cy + half, cz - half],  # 3
-        [cx - half, cy - half, cz + half],  # 4
-        [cx + half, cy - half, cz + half],  # 5
-        [cx + half, cy + half, cz + half],  # 6
-        [cx - half, cy + half, cz + half],  # 7
+        [cx - half, cy - half, cz - half],  # 0: Left-Down-Back
+        [cx + half, cy - half, cz - half],  # 1: Right-Down-Back
+        [cx + half, cy + half, cz - half],  # 2: Right-Up-Back
+        [cx - half, cy + half, cz - half],  # 3: Left-Up-Back
+        [cx - half, cy - half, cz + half],  # 4: Left-Down-Front
+        [cx + half, cy - half, cz + half],  # 5: Right-Down-Front
+        [cx + half, cy + half, cz + half],  # 6: Right-Up-Front
+        [cx - half, cy + half, cz + half],  # 7: Left-Up-Front
     ], dtype=np.float32)
-
-    faces = [
-        [0, 1, 2], [0, 2, 3],  # Back (-Z)
-        [4, 7, 6], [4, 6, 5],  # Front (+Z)
-        [0, 4, 5], [0, 5, 1],  # Bottom (-Y)
-        [3, 2, 6], [3, 6, 7],  # Top (+Y)
-        [0, 3, 7], [0, 7, 4],  # Left (-X)
-        [1, 5, 6], [1, 6, 2],  # Right (+X)
-    ]
-    face_indices = ['B', 'F', 'D', 'U', 'L', 'R']
 
     mesh_vertices = []
     mesh_faces = []
     face_colors_list = []
 
-    for i, (tri1, tri2) in enumerate(zip(faces[::2], faces[1::2])):
-        face_name = face_indices[i]
-        if face_name in face_colors:
-            color = face_colors[face_name]
-            for tri in (tri1, tri2):
-                mesh_faces.append([len(mesh_vertices) + j for j in range(3)])
-                mesh_vertices.extend(vertices[tri])
-                face_colors_list.extend([color] * 3)
+    # Create all 6 faces (12 triangles)
+    for (tri1, tri2, face_name) in CUBE_FACES:
+        color = face_colors[face_name]  # Must have all 6 faces
+        # Triangle 1
+        mesh_faces.append([len(mesh_vertices), len(mesh_vertices) + 1, len(mesh_vertices) + 2])
+        mesh_vertices.extend(vertices[tri1])
+        face_colors_list.append(color)
+        # Triangle 2
+        mesh_faces.append([len(mesh_vertices), len(mesh_vertices) + 1, len(mesh_vertices) + 2])
+        mesh_vertices.extend(vertices[tri2])
+        face_colors_list.append(color)
 
+    # Edge lines for cubie boundaries
     edge_data = None
     if show_edges:
         edges = [
-            [0, 1], [1, 2], [2, 3], [3, 0],
-            [4, 5], [5, 6], [6, 7], [7, 4],
-            [0, 4], [1, 5], [2, 6], [3, 7],
+            [0, 1], [1, 2], [2, 3], [3, 0],  # Back face
+            [4, 5], [5, 6], [6, 7], [7, 4],  # Front face
+            [0, 4], [1, 5], [2, 6], [3, 7],  # Connecting edges
         ]
         edge_x, edge_y, edge_z = [], [], []
         for e in edges:
@@ -453,7 +474,7 @@ def create_cubie_mesh(center_x, center_y, center_z, size, face_colors, show_edge
 
     return (np.array(mesh_vertices, dtype=np.float32),
             np.array(mesh_faces, dtype=np.int32),
-            face_colors_list,
+            np.array(face_colors_list, dtype=object),  # One color per triangle
             edge_data)
 
 
@@ -475,7 +496,10 @@ def get_cubie_center(i, j, k, n, exploded=False, explode_factor=1.5):
 
 
 def create_cube_mesh(state: CubeState, exploded=False, explode_factor=1.5, show_edges=True):
-    """Create complete mesh from a CubeState."""
+    """
+    Create complete mesh from a CubeState.
+    Every cubie gets all 6 faces. Exterior faces get sticker colors, interior get dark gray.
+    """
     n = state.n
     all_vertices = []
     all_faces = []
@@ -488,37 +512,46 @@ def create_cube_mesh(state: CubeState, exploded=False, explode_factor=1.5, show_
                 cx, cy, cz = get_cubie_center(i, j, k, n, exploded, explode_factor)
                 cubie_colors = state.get_cubie_face_colors(i, j, k)
 
-                if cubie_colors or exploded:
-                    # For exploded view, show all faces with their colors
-                    if exploded:
-                        # Use the actual colors from the state
-                        ext_faces = {}
-                        for face_name in ['U', 'D', 'F', 'B', 'R', 'L']:
-                            idx = state.get_cubie_face_colors(i, j, k).get(face_name)
-                            if idx is not None:
-                                ext_faces[face_name] = FACE_COLORS[idx]
-                            else:
-                                ext_faces[face_name] = FACE_COLORS[face_name]
+                # Build face_colors dict with ALL 6 faces
+                face_colors = {}
+                for face_name in FACE_ORDER:
+                    if face_name in cubie_colors:
+                        # Exterior face: use sticker color from cube state
+                        # cubie_colors[face_name] returns a face NAME like 'U', 'F', etc.
+                        color_face_name = cubie_colors[face_name]
+                        face_colors[face_name] = FACE_COLORS[color_face_name]
                     else:
-                        ext_faces = {k: FACE_COLORS[v] for k, v in cubie_colors.items()}
+                        # Interior face: dark gray
+                        face_colors[face_name] = INTERIOR_COLOR
 
-                    verts, faces, colors, edge_data = create_cubie_mesh(
-                        cx, cy, cz, CUBIE_SIZE, ext_faces, show_edges
-                    )
-                    if len(verts) > 0:
-                        faces_adjusted = faces + len(all_vertices) // 3
-                        all_vertices.extend(verts)
-                        all_faces.extend(faces_adjusted)
-                        all_colors.extend(colors)
-                        if edge_data is not None:
-                            all_edge_data.append(edge_data)
+                verts, faces, colors, edge_data = create_cubie_mesh(
+                    cx, cy, cz, CUBIE_SIZE, face_colors, show_edges
+                )
 
-    return (np.array(all_vertices, dtype=np.float32),
-            np.array(all_faces, dtype=np.int32),
-            all_colors,
-            all_edge_data)
+                # CRITICAL FIX: offset faces by current vertex count (not // 3)
+                faces_adjusted = faces + len(all_vertices)
+                all_vertices.extend(verts)
+                all_faces.extend(faces_adjusted)
+                all_colors.extend(colors)
+                if edge_data is not None:
+                    all_edge_data.append(edge_data)
 
+    # Convert to arrays
+    all_vertices = np.array(all_vertices, dtype=np.float32)
+    all_faces = np.array(all_faces, dtype=np.int32)
+    all_colors = np.array(all_colors, dtype=object)
 
+    # ASSERTIONS
+    assert len(all_colors) == len(all_faces), f"Color count {len(all_colors)} != face count {len(all_faces)}"
+
+    if not exploded and n == 3:
+        # 3x3 solved: 26 cubies * 6 faces = 156 faces = 312 triangles
+        # But only 54 sticker faces (9 per face * 6) should have non-interior colors
+        sticker_triangles = sum(1 for c in all_colors if c != INTERIOR_COLOR)
+        assert sticker_triangles == 108, f"Expected 108 sticker triangles, got {sticker_triangles}"
+        # 9 stickers per face * 6 faces * 2 triangles = 108
+
+    return (all_vertices, all_faces, all_colors.tolist(), all_edge_data)
 # ══════════════════════════════════════════════════════════════════════════════
 # ANIMATION FRAME GENERATION
 # ══════════════════════════════════════════════════════════════════════════════
